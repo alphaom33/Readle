@@ -4,25 +4,17 @@
 
 module SearchApp where
 
-import Data.Maybe
-import System.Environment
-import System.IO
-import Data.Char
-import Text.JSON.Generic
-import GHC.Generics
-import Control.Monad
-import Control.Monad.State.Class
-import Text.Wrap
-import Debug.Trace
+import Text.Wrap (WrapSettings(..), FillScope(..), FillStrategy(..))
+import GHC.Generics (Generic)
 
-import Brick
+import Brick as B
 import Brick.Main (App)
 
-import Graphics.Vty
+import Graphics.Vty as V
 
-import Lens.Micro.Mtl
-import Lens.Micro.TH
-import Lens.Micro;
+import Lens.Micro.Mtl ((.=), (%=), use, view)
+import Lens.Micro.TH (makeLenses)
+import Lens.Micro (set)
 
 data Item = Item {
     title :: String,
@@ -44,18 +36,23 @@ wrapSettings = WrapSettings {
     fillStrategy = NoFill,
     fillScope = FillAfterFirst}
 
-boxThing :: Int -> Item -> Widget Name
+boxThing :: Int -> Item -> B.Widget Name
+--TODO variable dst
 boxThing index item =
     let 
-        el yep = yep <=> strWrapWith wrapSettings ("  " ++ snippet item) <=> str " "
+        el yep = yep <=> str ("  " ++ snippet item) <=> str " "
         label = str (title item)
     in
         if index == 0 then el (withAttr (attrName "current") label) else el label
 
-drawUI :: State -> [Widget Name]
-drawUI state = [viewport Viewport1 Vertical $ vBox (zipWith boxThing (map (view cursorPos state-) [0..]) (view mytems state))]
+makeBoxes :: State -> [B.Widget Name]
+makeBoxes state = (zipWith boxThing (map (view cursorPos state-) [0..]) (view mytems state))
 
-getAttrMap :: State -> AttrMap
+drawUI :: State -> [B.Widget Name]
+drawUI state = [ viewport Viewport1 Vertical $ 
+    vBox $ makeBoxes state]
+
+getAttrMap :: State -> B.AttrMap
 getAttrMap _ = attrMap defAttr [(attrName "current", bg blue)]
 
 wrap :: (Int -> Int) -> State -> State
@@ -77,8 +74,8 @@ checkCur scroll cur =
     in
         if diff > 3 || diff < 1 then signum diff * 3 else 0
 
-handleEvent :: BrickEvent Name () -> EventM Name State ()
-handleEvent (VtyEvent event) =
+handleEvent :: B.BrickEvent Name () -> B.EventM Name State ()
+handleEvent (B.VtyEvent event) =
     let
         ack func = do
             modify $ wrap func
@@ -91,10 +88,10 @@ handleEvent (VtyEvent event) =
             vScrollBy (viewportScroll (Viewport1)) $ scrollby
     in
         case event of
-            EvKey KEsc [] -> halt
-            EvKey (KChar 'j') [] -> ack (+1)
-            EvKey (KChar 'k') [] -> ack (subtract 1)
-            EvKey kEnter [] -> do
+            V.EvKey V.KEsc [] -> halt
+            V.EvKey (V.KChar 'j') [] -> ack (+1)
+            V.EvKey (V.KChar 'k') [] -> ack (subtract 1)
+            V.EvKey V.KEnter [] -> do
                 curPos <- use cursorPos
                 mytems <- use mytems
                 ohNo .= link (mytems!!curPos)
@@ -102,31 +99,3 @@ handleEvent (VtyEvent event) =
             _ -> return ()
 
 handleEvent _ = return ()
-
-initialState = State {
-    _mytems = [
-        Item {title="asdf", link="a", snippet="snippetyyaya"},
-        Item {title="vsdf", link="b", snippet="znxcvjuoejilageownues"},
-        Item {title="asdf", link="c", snippet="snippetyyaya"},
-        Item {title="vsdf", link="d", snippet="znxcvjuoejilageownues"},
-        Item {title="asdf", link="e", snippet="snippetyyaya"},
-        Item {title="vsdf", link="f", snippet="znxcvjuoejilageownues"},
-        Item {title="asdf", link="g", snippet="snippetyyaya"},
-        Item {title="vsdf", link="h", snippet="znxcvjuoejilageownues"},
-        Item {title="asdf", link="i", snippet="snippetyyaya"},
-        Item {title="vsdf", link="j", snippet="znxcvjuoejilageownues"},
-        Item {title="asdf", link="k", snippet="snippetyyaya"},
-        Item {title="vsdf", link="l", snippet="znxcvjuoejilageownues"},
-        Item {title="asdf", link="l", snippet="snippetyyaya"},
-        Item {title="vsdf", link="l", snippet="znxcvjuoejilageownues"},
-        Item {title="asdf", link="l", snippet="snippetyyaya"},
-        Item {title="vsdf", link="l", snippet="znxcvjuoejilageownues"},
-        Item {title="asdf", link="l", snippet="snippetyyaya"},
-        Item {title="vsdf", link="l", snippet="znxcvjuoejilageownues"},
-        Item {title="asdf", link="l", snippet="snippetyyaya"},
-        Item {title="vsdf", link="l", snippet="znxcvjuoejilageownues"},
-        Item {title="asdf", link="l", snippet="snippetyyaya"},
-        Item {title="vsdf", link="l", snippet="znxcvjuoejilageownues"}],
-    _cursorPos = 0,
-    _cursorScroll = 0,
-    _ohNo = ""}

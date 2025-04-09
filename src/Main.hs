@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
 import Data.Maybe
@@ -9,7 +10,7 @@ import Data.Char
 import Network.HTTP.Simple
 import Text.RegexPR
 import Text.JSON.Generic
-import Data.Aeson
+import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics
 import Control.Monad
 import Text.Wrap
@@ -22,15 +23,16 @@ import Graphics.Vty
 
 import Lens.Micro.Mtl
 import Lens.Micro.TH
+import Lens.Micro;
 
 data Item = Item {
-    title :: String,
-    link :: String,
-    snippet :: String
+    _title :: String,
+    _link :: String,
+    _snippet :: String
 } deriving (Show, Generic)
 
 newtype GoogleResponse = GoogleResponse {
-    items :: [Item]
+    _items :: [Item]
 } deriving (Show, Generic)
 
 instance FromJSON Item
@@ -39,6 +41,9 @@ instance ToJSON Item
 instance FromJSON GoogleResponse
 instance ToJSON GoogleResponse
 
+$(makeLenses ''GoogleResponse)
+$(makeLenses ''Item)
+
 wrapSettings = WrapSettings {
     preserveIndentation = True,
     breakLongWords = True,
@@ -46,10 +51,10 @@ wrapSettings = WrapSettings {
     fillScope = FillAfterFirst}
 
 boxThing :: Item -> Widget ()
-boxThing item = str (title item) <=> strWrapWith wrapSettings ("  " ++ snippet item) <=> str " "
+boxThing item = str (view title item) <=> strWrapWith wrapSettings ("  " ++ view snippet item) <=> str " "
 
-drawUI :: MyAppState -> [Widget ()]
-drawUI state = [str (_ohno state)]
+drawUI :: State -> [Widget ()]
+drawUI state = [str (ohNo state)]
 
 ui :: [Item] -> Widget ()
 ui items = vBox (map boxThing items)
@@ -62,7 +67,7 @@ ui items = vBox (map boxThing items)
     -- body <- (getResponse (head args) apiKey) :: IO (Response GoogleResponse)
     -- let links = getResponseBody body
 
-getAttrMap :: MyAppState -> AttrMap
+getAttrMap :: State -> AttrMap
 getAttrMap _ = attrMap defAttr [(attrName "asdf", bg blue)]
 
 data State = State {
@@ -71,13 +76,11 @@ data State = State {
     ohNo :: String
 } deriving Show
 
-data MyAppState = MyAppState {_ohno :: String}
-
-handleEvent :: BrickEvent () () -> EventM () MyAppState ()
+handleEvent :: BrickEvent () e -> EventM () State ()
 handleEvent (VtyEvent event) = do
     case event of
         EvKey KEsc [] -> halt
-        EvKey KEnter [] -> put MyAppState {_ohno = "asdf"}
+        EvKey KEnter [] -> ohNo .= "afds"
         _ -> return ()
 
 handleEvent _ = return ()
@@ -87,8 +90,8 @@ main = let app = Brick.App {
                 appChooseCursor = neverShowCursor,
                 appDraw = drawUI,
                 appHandleEvent = handleEvent,
-                appAttrMap = getAttrMap} :: Brick.App MyAppState () ()
-           initialState = MyAppState {_ohno = ""}
+                appAttrMap = getAttrMap} :: Brick.App State () ()
+           initialState = State {mytems = [], cursorPos = 0, ohNo = ""}
            in 
            defaultMain app initialState
 

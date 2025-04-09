@@ -28,17 +28,43 @@ getResponse initial key = do
     S.httpJSON request
 
 main = do 
-    key <- lookupEnv "GOOGLE_API_KEY"
-    let apiKey = fromJust key
-    args <- getArgs
-    body <- (getResponse (head args) apiKey) :: IO (Response GoogleResponse)
-    let links = getResponseBody body
+    -- key <- lookupEnv "GOOGLE_API_KEY"
+    -- let apiKey = fromJust key
+    -- args <- getArgs
+    -- body <- getResponse (head args) apiKey :: IO (Response GoogleResponse)
+    -- let links = getResponseBody body
 
     let initialState = State {
-        _mytems = (items links),
+        _mytems = [
+            Item {title="adsf", snippet="ohno", link="goodness"},
+            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
+            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
+            Item {title="adsf", snippet="ohno", link="goodness"},
+            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
+            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
+            Item {title="adsf", snippet="ohno", link="goodness"},
+            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
+            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
+            Item {title="adsf", snippet="ohno", link="goodness"},
+            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
+            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
+            Item {title="adsf", snippet="ohno", link="goodness"},
+            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
+            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
+            Item {title="adsf", snippet="ohno", link="goodness"},
+            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
+            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
+            Item {title="adsf", snippet="ohno", link="goodness"},
+            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
+            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
+            Item {title="adsf", snippet="ohno", link="goodness"},
+            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
+            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"}
+        ],
         _cursorPos = 0,
         _cursorScroll = 0,
-        _ohNo = ""}
+        _ohNo = "",
+        _canMove = True}
 
     let app = B.App {
         appStartEvent = return (),

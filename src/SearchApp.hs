@@ -7,20 +7,24 @@ module SearchApp where
 import Text.Wrap (WrapSettings(..), FillScope(..), FillStrategy(..))
 import GHC.Generics (Generic)
 
-import Brick as B
+import Brick
 import Brick.Main (App)
 
 import Graphics.Vty as V
 
 import Lens.Micro.Mtl ((.=), (%=), use, view)
 import Lens.Micro.TH (makeLenses)
-import Lens.Micro (set)
+import Lens.Micro (set, (^.))
 
-import Control.Monad (join)
+import Control.Monad (join, when, unless)
 import Data.Maybe (fromJust)
 import Brick.Widgets.Center (center, hCenter)
 import Brick.Widgets.Border (border)
 import Brick.Widgets.Border.Style
+import Brick.Forms (editTextField, (@@=), renderForm, newForm, Form (formState, formFocus), handleFormEvent, setFieldValid, FormFieldState (formFieldUpdate))
+import Data.Text (Text)
+import Brick.Focus (focusRingCursor)
+import Message (Message(NewSearch, Error, EnterSite))
 
 data Item = Item {
     title :: String,
@@ -28,13 +32,24 @@ data Item = Item {
     snippet :: String
 } deriving (Show, Generic)
 
+newtype Search = Search {
+    _query :: Text
+} deriving (Eq, Ord, Show)
+$(makeLenses ''Search)
+
+data Name = Viewport1 | QueryField deriving (Show, Eq, Ord)
+
 data State = State {
     _mytems :: [Item],
     _cursorPos :: Int,
     _cursorScroll :: Int,
-    _ohNo :: String,
-    _canMove :: Bool
-} deriving Show
+    _message :: Message,
+    _canMove :: Bool,
+    _form :: Form Search () Name
+}
+instance Show State where
+    show a = "_mytems: " ++ show (_mytems a) ++ " _cursorPos: " ++ show (_cursorPos a) ++ " _canMove: " ++ show (_canMove a) ++ "\n"
+
 $(makeLenses ''State)
 
 wrapSettings = WrapSettings {
@@ -43,47 +58,54 @@ wrapSettings = WrapSettings {
     fillStrategy = NoFill,
     fillScope = FillAfterFirst}
 
-makeSearch :: B.Widget Name
-makeSearch = withAttr (attrName "searchBox") $ hCenter $ border $ str "dsaf"
+mkForm :: Search -> Form Search e Name
+mkForm = newForm [ editTextField query QueryField (Just 1) ]
+
+drawForm :: State -> Widget Name
+drawForm state =
+    let
+        attr = withAttr $ attrName "searchBox"
+    in
+        attr $ border $ hCenter $ renderForm $ view form state
 
 --TODO variable dst
-boxThing :: Int -> Item -> B.Widget Name
+boxThing :: Int -> Item -> Widget Name
 boxThing index item =
-    let 
+    let
         el yep = yep <=> str ("  " ++ snippet item) <=> str " "
         label = str (title item)
     in
         if index == 0 then el (withAttr (attrName "current") label) else el label
 
-makeBoxes :: State -> [B.Widget Name]
+makeBoxes :: State -> [Widget Name]
 makeBoxes state = zipWith boxThing (map (view cursorPos state-) [0..]) (view mytems state)
 
-drawUI :: State -> [B.Widget Name]
-drawUI state = (if not $ view canMove state then (makeSearch:) else id) [viewport Viewport1 Vertical $ 
-    vBox $ makeBoxes state]
+drawUI :: State -> [Widget Name]
+drawUI state = (if not $ view canMove state then (drawForm state:) else id)
+    [viewport Viewport1 Vertical $ vBox $ makeBoxes state]
 
-getAttrMap :: State -> B.AttrMap
+getAttrMap :: State -> AttrMap
 getAttrMap state = attrMap defAttr [
     (attrName "current", if view canMove state then bg blue else defAttr),
-    (attrName "searchBox", if not $ view canMove state then fg white else fg black)]
+    (attrName "searchBox", if not $ view canMove state then fg white else fg black),
+    (attrName "focusedFormInputAttr", white `on` blue),
+    (attrName "invalidFormInputAttr", red `on` yellow)]
 
 wrap :: (Int -> Int) -> State -> State
-wrap func state = 
+wrap func state =
     let
         cur = func $ view cursorPos state
         top = fromIntegral  (length $ view mytems state) - 1
         wrap = min top $ max 0 cur
-    in 
+    in
         set cursorPos wrap state
-
-data Name = Viewport1 deriving (Show, Eq, Ord)
 
 checkCur :: Int -> Int -> Int -> Int
 checkCur scroll cur height
     | diff > (adjustedHeight - scrollBarrier) = 3
     | diff < scrollBarrier = -3
     | otherwise = 0
-    where 
+    where
         scrollBarrier = 1
         diff = cur - (scroll `div` 3)
         adjustedHeight = height `div` 3
@@ -103,18 +125,42 @@ moveCursor func = do
     cursorScroll %= (+scrollby)
     vScrollBy (viewportScroll Viewport1) scrollby
 
-handleEvent :: B.BrickEvent Name () -> B.EventM Name State ()
-handleEvent (B.VtyEvent event) =
-    case event of
-        V.EvKey V.KEsc [] -> halt
-        V.EvKey (V.KChar 'j') [] -> moveCursor (+1)
-        V.EvKey (V.KChar 'k') [] -> moveCursor (subtract 1)
-        V.EvKey V.KEnter [] -> do
+handleEvent :: BrickEvent Name () -> EventM Name State ()
+handleEvent event = do
+    curCanMove <- use canMove
+    let (VtyEvent ev) = event
+    case (curCanMove, ev) of
+        (_, V.EvKey V.KEsc []) -> halt
+        (True, V.EvKey (V.KChar 'j') []) -> moveCursor (+1)
+        (True, V.EvKey (V.KChar 'k') []) -> moveCursor (subtract 1)
+        (True, V.EvKey V.KEnter []) -> do
             curPos <- use cursorPos
             mytems <- use mytems
-            ohNo .= link (mytems!!curPos)
+            message .= EnterSite (link (mytems!!curPos))
             halt
-        V.EvKey (V.KChar '=') [] -> canMove %= not
-        _ -> return ()
+        (False, V.EvKey V.KEnter []) -> do
+            canMove .= True
+            message .= NewSearch
+            halt
+        (_, V.EvKey (V.KChar '=') []) -> do
+            canMove %= not
+            form .= emptyForm
+        (False, _) -> zoom form $ handleFormEvent event
 
-handleEvent _ = return ()
+
+emptyForm = mkForm Search {_query=""}
+
+initialState links = State {
+    _mytems = links,
+    _cursorPos = 0,
+    _cursorScroll = 0,
+    _message = Error "",
+    _canMove = True,
+    _form = emptyForm}
+
+app = App {
+    appStartEvent = return (),
+    appChooseCursor = focusRingCursor formFocus . view form,
+    appDraw = drawUI,
+    appHandleEvent = handleEvent,
+    appAttrMap = getAttrMap} :: App State () Name

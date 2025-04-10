@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import System.Environment (getArgs, lookupEnv)
@@ -9,6 +10,12 @@ import GHC.Generics (Generic)
 import Network.HTTP.Simple as S
 import Text.RegexPR (gsubRegexPR)
 import Data.Maybe (fromJust)
+import Brick.Focus (focusRingCursor)
+import Brick.Forms (Form(formFocus, formState), handleFormEvent)
+import Lens.Micro.Extras (view)
+import Message (Message(NewSearch))
+import Control.Monad (join)
+import Data.Text (Text, unpack)
 
 newtype GoogleResponse = GoogleResponse {
     items :: [Item]
@@ -27,50 +34,17 @@ getResponse initial key = do
     request <- S.parseRequest requestScheme
     S.httpJSON request
 
+runSearch :: String -> String -> IO ()
+runSearch key query = do
+    body <- getResponse query key :: IO (Response GoogleResponse)
+    let links = getResponseBody body
+    finalState <- defaultMain app $ initialState $ items links
+    case _message finalState of
+        NewSearch -> do
+            runSearch key $ unpack $ _query $ formState $ _form finalState
+
 main = do 
-    -- key <- lookupEnv "GOOGLE_API_KEY"
-    -- let apiKey = fromJust key
-    -- args <- getArgs
-    -- body <- getResponse (head args) apiKey :: IO (Response GoogleResponse)
-    -- let links = getResponseBody body
-
-    let initialState = State {
-        _mytems = [
-            Item {title="adsf", snippet="ohno", link="goodness"},
-            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
-            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
-            Item {title="adsf", snippet="ohno", link="goodness"},
-            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
-            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
-            Item {title="adsf", snippet="ohno", link="goodness"},
-            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
-            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
-            Item {title="adsf", snippet="ohno", link="goodness"},
-            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
-            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
-            Item {title="adsf", snippet="ohno", link="goodness"},
-            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
-            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
-            Item {title="adsf", snippet="ohno", link="goodness"},
-            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
-            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
-            Item {title="adsf", snippet="ohno", link="goodness"},
-            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
-            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"},
-            Item {title="adsf", snippet="ohno", link="goodness"},
-            Item {title="xcjvkl", snippet=",xczvjkxlcz", link="goodness"},
-            Item {title="menrbewnrm", snippet="iewporiwprwip", link="xcvjiocx;vcxzj"}
-        ],
-        _cursorPos = 0,
-        _cursorScroll = 0,
-        _ohNo = "",
-        _canMove = True}
-
-    let app = B.App {
-        appStartEvent = return (),
-        appChooseCursor = neverShowCursor,
-        appDraw = drawUI,
-        appHandleEvent = handleEvent,
-        appAttrMap = getAttrMap} :: B.App State () Name
-    newState <- defaultMain app initialState
-    print $ _ohNo newState
+    key <- lookupEnv "GOOGLE_API_KEY"
+    let apiKey = fromJust key
+    args <- getArgs
+    runSearch apiKey (head args)

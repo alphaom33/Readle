@@ -17,7 +17,10 @@ cabal-version:       >=1.10
 
 executable Readle
   main-is:             Main.hs
-  other-modules: SearchApp
+  other-modules:
+      SearchApp
+      Webpage
+      Message
   -- other-extensions:
   build-depends:       
     base >=4.14,
@@ -29,6 +32,7 @@ executable Readle
     text >= 2.0.2,
     brick >= 2.8.3,
     vty >= 6.4,
+    vty-crossplatform >= 0.4,
     word-wrap >= 0.5,
     microlens-th >= 0.4.3,
     microlens-mtl >= 0.2.1,

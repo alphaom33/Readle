@@ -24,7 +24,7 @@ import Brick.Widgets.Border.Style
 import Brick.Forms (editTextField, (@@=), renderForm, newForm, Form (formState, formFocus), handleFormEvent, setFieldValid, FormFieldState (formFieldUpdate))
 import Data.Text (Text)
 import Brick.Focus (focusRingCursor)
-import Message (Message(NewSearch, Error, EnterSite))
+import Message (Message(NewSearch, Error, EnterSite, NextPage, LastPage))
 
 data Item = Item {
     title :: String,
@@ -131,20 +131,28 @@ handleEvent event = do
     let (VtyEvent ev) = event
     case (curCanMove, ev) of
         (_, V.EvKey V.KEsc []) -> halt
+        (_, V.EvKey (V.KChar '=') []) -> do
+            canMove %= not
+            form .= emptyForm
+
         (True, V.EvKey (V.KChar 'j') []) -> moveCursor (+1)
         (True, V.EvKey (V.KChar 'k') []) -> moveCursor (subtract 1)
+        (True, V.EvKey (V.KChar 'h') []) -> do
+            message .= LastPage
+            halt
+        (True, V.EvKey (V.KChar 'l') []) -> do
+            message .= NextPage
+            halt
         (True, V.EvKey V.KEnter []) -> do
             curPos <- use cursorPos
             mytems <- use mytems
             message .= EnterSite (link (mytems!!curPos))
             halt
+
         (False, V.EvKey V.KEnter []) -> do
             canMove .= True
             message .= NewSearch
             halt
-        (_, V.EvKey (V.KChar '=') []) -> do
-            canMove %= not
-            form .= emptyForm
         (False, _) -> zoom form $ handleFormEvent event
 
 

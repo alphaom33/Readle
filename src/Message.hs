@@ -1,4 +1,4 @@
 module Message where
 import Data.Text (Text)
 
-data Message = NewSearch | EnterSite String | Error String deriving Show
+data Message = NextPage | LastPage | NewSearch | EnterSite String | Error String deriving Show

@@ -21,6 +21,7 @@ executable Readle
       SearchApp
       Webpage
       Message
+      Network
   -- other-extensions:
   build-depends:       
     base >=4.14,

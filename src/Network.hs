@@ -2,7 +2,6 @@
 module Network where
 
 import System.Environment (getArgs, lookupEnv)
-import SearchApp
 import Brick as B
 import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
@@ -15,6 +14,7 @@ import Lens.Micro.Extras (view)
 import Message (Message(NewSearch, NextPage, LastPage))
 import Control.Monad (join)
 import Data.Text (Text, unpack)
+import Item (Item)
 
 
 newtype GoogleResponse = GoogleResponse {
@@ -27,9 +27,13 @@ instance ToJSON Item
 instance FromJSON GoogleResponse
 instance ToJSON GoogleResponse
 
-getResponse :: String -> String -> Int -> IO (Response GoogleResponse)
+getResponse :: String -> String -> Int -> IO [Item]
 getResponse initial key start = do
     let query = gsubRegexPR " " "+" initial
-    let requestScheme = "https://www.googleapis.com/customsearch/v1?q=" ++ query ++ "&key=" ++ key ++ "&cx=1433b113b742d4cdb" ++ "&start=" ++ show start
+    let requestScheme = "https://www.googleapis.com/customsearch/v1?q=" ++ query ++ "&key=" ++ key ++ "&cx=1433b113b742d4cdb" ++ "&start=" ++ show (start * 10)
     request <- S.parseRequest requestScheme
-    S.httpJSON request
+    let
+        response = S.httpJSON request
+        googleResponse = fmap getResponseBody response
+        itemResponse = fmap items googleResponse
+    itemResponse

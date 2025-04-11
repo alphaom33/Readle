@@ -22,15 +22,13 @@ import Brick.Widgets.Center (center, hCenter)
 import Brick.Widgets.Border (border)
 import Brick.Widgets.Border.Style
 import Brick.Forms (editTextField, (@@=), renderForm, newForm, Form (formState, formFocus), handleFormEvent, setFieldValid, FormFieldState (formFieldUpdate))
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 import Brick.Focus (focusRingCursor)
 import Message (Message(NewSearch, Error, EnterSite, NextPage, LastPage))
-
-data Item = Item {
-    title :: String,
-    link :: String,
-    snippet :: String
-} deriving (Show, Generic)
+import Brick.BChan
+import Item (Item (title, snippet, link))
+import Network (getResponse)
+import Control.Monad.Cont (MonadIO(liftIO))
 
 newtype Search = Search {
     _query :: Text
@@ -40,12 +38,14 @@ $(makeLenses ''Search)
 data Name = Viewport1 | QueryField deriving (Show, Eq, Ord)
 
 data State = State {
+    _curQuery :: String,
+    _key :: String,
+    _page :: Int,
     _mytems :: [Item],
     _cursorPos :: Int,
     _cursorScroll :: Int,
-    _message :: Message,
     _canMove :: Bool,
-    _form :: Form Search () Name
+    _form :: Form Search Message Name
 }
 instance Show State where
     show a = "_mytems: " ++ show (_mytems a) ++ " _cursorPos: " ++ show (_cursorPos a) ++ " _canMove: " ++ show (_canMove a) ++ "\n"
@@ -125,7 +125,23 @@ moveCursor func = do
     cursorScroll %= (+scrollby)
     vScrollBy (viewportScroll Viewport1) scrollby
 
-handleEvent :: BrickEvent Name () -> EventM Name State ()
+movePage :: (Int -> Int) -> EventM Name State ()
+movePage dir = do
+    curQuery' <- use curQuery
+    key' <- use key
+
+    last <- use page
+    page %= dir
+    page %= max 0
+    page' <- use page
+    when (last /= page') (do
+        next <- liftIO (getResponse curQuery' key' page')
+        mytems .= next)
+
+handleEvent :: BrickEvent Name Message -> EventM Name State ()
+
+handleEvent (AppEvent e) = return ()
+
 handleEvent event = do
     curCanMove <- use canMove
     let (VtyEvent ev) = event
@@ -137,38 +153,46 @@ handleEvent event = do
 
         (True, V.EvKey (V.KChar 'j') []) -> moveCursor (+1)
         (True, V.EvKey (V.KChar 'k') []) -> moveCursor (subtract 1)
-        (True, V.EvKey (V.KChar 'h') []) -> do
-            message .= LastPage
-            halt
-        (True, V.EvKey (V.KChar 'l') []) -> do
-            message .= NextPage
-            halt
-        (True, V.EvKey V.KEnter []) -> do
-            curPos <- use cursorPos
-            mytems <- use mytems
-            message .= EnterSite (link (mytems!!curPos))
-            halt
+        (True, V.EvKey (V.KChar 'h') []) -> movePage (subtract 1)
+        (True, V.EvKey (V.KChar 'l') []) -> movePage (+ 1)
+        -- (True, V.EvKey V.KEnter []) -> do
+        --     curPos <- use cursorPos
+        --     mytems <- use mytems
+        --     message .= EnterSite (link (mytems!!curPos))
+        --     halt
 
         (False, V.EvKey V.KEnter []) -> do
             canMove .= True
-            message .= NewSearch
-            halt
+            key' <- use key
+            page' <- use page
+            form' <- use form
+            next <- liftIO (getResponse (unpack (_query $ formState form')) key' page')
+            mytems .= next
         (False, _) -> zoom form $ handleFormEvent event
 
 
 emptyForm = mkForm Search {_query=""}
 
-initialState links = State {
-    _mytems = links,
+initialState key query = State {
+    _curQuery = query,
+    _key = key,
+    _page = 0,
+    _mytems = [],
     _cursorPos = 0,
     _cursorScroll = 0,
-    _message = Error "",
     _canMove = True,
     _form = emptyForm}
 
+start = do
+    curQuery' <- use curQuery
+    key' <- use key
+    page' <- use page
+    next <- liftIO (getResponse curQuery' key' page')
+    mytems .= next
+
 app = App {
-    appStartEvent = return (),
+    appStartEvent = start,
     appChooseCursor = focusRingCursor formFocus . view form,
     appDraw = drawUI,
     appHandleEvent = handleEvent,
-    appAttrMap = getAttrMap} :: App State () Name
+    appAttrMap = getAttrMap} :: App State Message Name

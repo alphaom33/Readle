@@ -25,10 +25,12 @@ import Brick.BChan (readBChan, writeBChan)
 import SearchApp
 import Network
 import Message (Message(NewSearch, NextPage, LastPage))
+import HTMLParser (parseString)
 
 main = do 
-    key <- lookupEnv "GOOGLE_API_KEY"
-    let apiKey = fromJust key
-    args <- getArgs
-    finalState <- defaultMain app $ initialState apiKey (head args)
-    print finalState
+    print $ parseString "<asdf>ohhohonoooo<asdf><oh>weee</oh>hahaha</asdf>asjdflklkdsaf<oh></oh></asdf>"
+    -- key <- lookupEnv "GOOGLE_API_KEY"
+    -- let apiKey = fromJust key
+    -- args <- getArgs
+    -- finalState <- defaultMain app $ initialState apiKey (head args)
+    -- print finalState

@@ -23,6 +23,7 @@ executable Readle
       Message
       Network
       HTMLParser
+      Item
   -- other-extensions:
   build-depends:       
     base >=4.14,

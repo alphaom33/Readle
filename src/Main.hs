@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
@@ -13,46 +12,23 @@ import GHC.Generics (Generic)
 import Network.HTTP.Simple as S
 import Text.RegexPR as R
 import Data.Maybe (fromJust)
+import Brick.Focus (focusRingCursor)
+import Brick.Forms (Form(formFocus, formState), handleFormEvent)
+import Lens.Micro.Extras (view)
 import Control.Monad (join)
-import qualified Data.ByteString.Lazy.Char8 as L8
+import Data.Text (Text, unpack)
+import qualified Brick.BChan as B
+import Graphics.Vty.CrossPlatform (mkVty)
+import Graphics.Vty (defaultConfig)
+import Brick.BChan (readBChan, writeBChan)
 
-newtype GoogleResponse = GoogleResponse {
-    items :: [SearchApp.Item]
-} deriving (Show, Generic)
-
-instance FromJSON SearchApp.Item
-instance ToJSON SearchApp.Item
-
-instance FromJSON GoogleResponse
-instance ToJSON GoogleResponse
-
-getResponse :: String -> String -> IO (Response GoogleResponse)
-getResponse initial key = do
-    let query = R.gsubRegexPR " " "+" initial
-    let requestScheme = "https://www.googleapis.com/customsearch/v1?q=" ++ query ++ "&key=" ++ key ++ "&cx=1433b113b742d4cdb"
-    request <- S.parseRequest requestScheme
-    S.httpJSON request
+import SearchApp
+import Network
+import Message (Message(NewSearch, NextPage, LastPage))
 
 main = do 
-    print $ HTMLParser.parseString "<aasdf8></a>"
-    -- let codes = R.multiMatchRegexPR "(?<=<code>).*?(?=</code>)" $ L8.unpack html
-    -- key <- lookupEnv "GOOGLE_API_KEY"
-    -- let apiKey = fromJust key
-    -- args <- getArgs
-    -- body <- (getResponse (head args) apiKey) :: IO (Response GoogleResponse)
-    -- let links = getResponseBody body
-
-    -- let initialState = Search.State {
-    --     _mytems = (items links),
-    --     _cursorPos = 0,
-    --     _cursorScroll = 0,
-    --     _ohNo = ""}
-
-    -- let app = B.App {
-    --     appStartEvent = return (),
-    --     appChooseCursor = neverShowCursor,
-    --     appDraw = drawUI,
-    --     appHandleEvent = handleEvent,
-    --     appAttrMap = getAttrMap} :: B.App Search.State () Search.Name
-    -- newState <- defaultMain app initialState
-    -- newState <- defaultMain Webpage.app Webpage.initialState
+    key <- lookupEnv "GOOGLE_API_KEY"
+    let apiKey = fromJust key
+    args <- getArgs
+    finalState <- defaultMain app $ initialState apiKey (head args)
+    print finalState
